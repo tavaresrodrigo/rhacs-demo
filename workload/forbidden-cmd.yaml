@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: netcat-test
+  namespace: acsdemo
+  labels:
+    app: netcat-test
+spec:
+  containers:
+  - name: netcat
+    image: busybox:latest
+    command:
+      - /bin/sh
+      - -c
+      - nc -lvnp 4444
