@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: frontend
+  namespace: acsdemo
+  labels:
+    app: frontend
+spec:
+  containers:
+  - name: frontend
+    image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+    command:
+      - /bin/sh
+      - -c
+      - |
+        while true; do
+          nc backend 8080 || true;
+          sleep 5;
+        done

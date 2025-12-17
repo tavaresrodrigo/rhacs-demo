@@ -53,7 +53,6 @@ Demonstrate how RHACS enforces security across the container lifecycle by deploy
 - HostPath, HostNetwork, and HostPID restrictions with approved exceptions
 - Image registry allowlisting (approved vs denied registries)
 - CVE acceptance criteria (severity thresholds)
-- Mandatory CPU and memory requests / limits
 - Benchmarks referenced (CIS Kubernetes)
 
 ### Runtime Security
@@ -193,3 +192,82 @@ $ oc get events | grep -i stackrox
 Go to `<Violations> <Active>`, search for **Netcat Execution Detected**, click the policy name, and review the violation details:
 
 ![netcat test](/images/netcat.png)
+
+---
+
+## Blocking containers running as root
+
+Running containers as the root user (`UID 0`) weakens the security boundary between the application and the container runtime. If a vulnerability is exploited in a root container, the attacker gains elevated privileges inside the container, which increases the likelihood of container escape, host compromise, or abuse of mounted volumes and credentials.
+
+In most application workloads, running as root is unnecessary. Enforcing non-root execution reduces the blast radius of an attack and aligns with Kubernetes and OpenShift security best practices.
+
+```bash
+[...]
+securityContext:
+  runAsUser: 0
+  allowPrivilegeEscalation: true
+[...]
+```
+
+Deploy a non-compliant workload that runs as the root user:
+
+```bash
+oc apply -f workloads/run-as-root.yaml
+```
+
+Observe in ACS:
+
+- Admission decision (allowed or blocked)
+- Violation generated for running as root
+- Enforcement action, if enabled
+
+### Enforcing the policy
+
+Change the policy action to **Inform and enforce** at the **Deployment** stage.
+
+Go to `<Platform Configuration> <Policy Management> <Policy Behavior> <Actions>` and enable enforcement for the policy **Container Runs as Root User** (or equivalent).
+
+Recreate the workload after enabling enforcement:
+
+```bash
+oc delete -f workloads/run-as-root.yaml
+oc apply -f workloads/run-as-root.yaml
+```
+
+Observe the command output and describe what happened.
+
+---
+
+## Visualizing network communication with NetworkPolicy graph
+
+This exercise illustrates the Network Graph view in ACS. By deploying two workloads in the same namespace and selectively allowing traffic between them, you can observe how ACS builds a clear picture of allowed and denied network paths.
+
+NetworkPolicies are a key control for reducing lateral movement. RHACS does not enforce NetworkPolicies itself, but it **analyzes, visualizes, and correlates** them with runtime activity, helping teams understand actual communication patterns versus intended policy.
+
+---
+
+### Scenario description
+
+- Two workloads are deployed in the `acsdemo` namespace:
+  - `frontend` (client)
+  - `backend` (server)
+- A NetworkPolicy allows traffic **only from frontend to backend** on a specific port
+- All other ingress traffic to the backend is denied by default
+
+This setup allows ACS to show:
+- Allowed communication paths
+- Denied or absent paths
+- Policy-driven segmentation in the network graph
+
+**Deploy the backend and frontend workload**
+
+```bash
+$ oc apply -f workloads/np-backend.yaml
+$ oc apply -f workloads/np-frontend.yaml
+```
+
+**Deploy the networkPolicies**
+
+```bash
+$ oc apply -f workloads/np.yaml
+```
